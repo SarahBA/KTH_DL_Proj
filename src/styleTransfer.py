@@ -55,8 +55,8 @@ style_array[:, :, :, 2] -= meanRGB[2]
 style_array = style_array[:, :, :, ::-1]
 
 # Creating placeholders in tensorflow
-content_tensor = backend.variable(content_array)
-style_tensor = backend.variable(style_array)
+content_tensor = backend.constant(content_array)
+style_tensor = backend.constant(style_array)
 result_tensor = backend.placeholder((1, height, width, 3))
 
 # The tensor that will be fed to the VGG19 network
