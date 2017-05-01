@@ -12,9 +12,9 @@ from ScipyOptimizer import ScipyOptimizer
 
 
 ##### Parameters
-content_weight = 0.025 # 0.025 when 512*512
-style_weight = 5.0 # 5.0 when 512*512
-regularization = 1.0 # 1.0 when 512*512 (0 in the original paper) 
+content_weight = 1 # 0.05 when 512*512
+style_weight = 10 # 5.0 when 512*512
+regularization = 10 # 1.0 when 512*512 (0 in the original paper) 
 style_path = "../images/scream.jpg"
 content_path = "../images/tubingen.jpg"
 max_iter = 10
@@ -55,7 +55,7 @@ def total_variation_loss(x):
 
 
 ##### Images Loading
-meanRGB = [103.939, 116.779, 123.68];
+meanRGB = [123.68, 116.779, 103.939];
 
 content_image = Image.open(content_path)
 content_image = content_image.resize((height, width))
