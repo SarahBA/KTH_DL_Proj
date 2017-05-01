@@ -1,4 +1,5 @@
 from PIL import Image
+import math
 import numpy as np
 import time
 from PIL import Image
@@ -8,6 +9,22 @@ from keras.applications.vgg19 import VGG19
 from scipy.optimize import fmin_l_bfgs_b
 
 from ScipyOptimizer import ScipyOptimizer
+
+
+##### Parameters
+content_weight = 0.025 # 0.025 when 512*512
+style_weight = 5.0 # 5.0 when 512*512
+regularization = 1.0 # 1.0 when 512*512 (0 in the original paper) 
+style_path = "../images/scream.jpg"
+content_path = "../images/tubingen.jpg"
+max_iter = 10
+height = 128    # Size of images in the paper : 512*512
+width = 128
+
+content_layer_name = "block4_conv2"
+style_layers_names = ["block1_conv1", "block2_conv1", "block3_conv1",
+                      "block4_conv1", "block5_conv1"]
+style_layers_weights = [0.2, 0.2, 0.2, 0.2, 0.2]     # Must be of the same size as style_layers_names
 
 
 ###### Functions definitions
@@ -24,32 +41,17 @@ def gram_matrix(x):
 
 
 def style_loss(style, combination):
-    S = gram_matrix(style)
-    C = gram_matrix(combination)
+    A = gram_matrix(style)
+    G = gram_matrix(combination)
     channels = 3
     size = height * width
-    return backend.sum(backend.square(S - C)) / (4. * (channels ** 2) * (size ** 2))
+    return backend.sum(backend.square(G - A)) / (4. * (channels ** 2) * (size ** 2))
 
 
 def total_variation_loss(x):
     a = backend.square(x[:, :height-1, :width-1, :] - x[:, 1:, :width-1, :])
     b = backend.square(x[:, :height-1, :width-1, :] - x[:, :height-1, 1:, :])
     return backend.sum(backend.pow(a + b, 1.25))
-
-
-##### Parameters
-content_weight = 1 # 0.025
-style_weight = 1 # 5.0
-total_variation_weight = 1.0
-style_path = "../images/picasso.jpg"
-content_path = "../images/elephant.png"
-max_iter = 10
-height = 256
-width = 256
-
-content_layer_name = "block2_conv2"
-style_layers_names = ["block1_conv2", "block2_conv2", "block3_conv3",
-                      "block4_conv3", "block5_conv3"]
 
 
 ##### Images Loading
@@ -92,33 +94,44 @@ model = VGG19(input_tensor=input_tensor, weights="imagenet", include_top=False, 
 model_layers = dict([(layer.name, layer.output) for layer in model.layers])
 
 
-###### Defining the loss function
+###### Defining the total loss function
 loss = backend.variable(0)
+
+# The Content loss
 loss += content_weight * content_loss(model_layers[content_layer_name][0, :, :, :], model_layers[content_layer_name][2, :, :, :])
 
 # The Style loss
-for layer_name in style_layers_names:
+total_style_loss = backend.variable(0)
+for index, layer_name in enumerate(style_layers_names):
     layer_features = model_layers[layer_name]
     style_features = layer_features[1, :, :, :]
     combination_features = layer_features[2, :, :, :]
     sl = style_loss(style_features, combination_features)
-    loss += (style_weight / len(style_layers_names)) * sl
+    total_style_loss += style_layers_weights[index] * sl
 
-loss += total_variation_weight * total_variation_loss(result_tensor)
+loss += style_weight * total_style_loss
+
+# Regularization of the result image
+loss += regularization * total_variation_loss(result_tensor)
 
 
 ###### Generating the result image
 scipyOpt = ScipyOptimizer(loss, result_tensor)
 result_image = np.random.uniform(0, 255, (1, height, width, 3)) - 128
 
+total_time = 0
 try:
     for i in range(max_iter):
-        print("======= Starting iteration %d =======" % (i))
+        print("======= Starting iteration %d =======" % (i+1))
         start_time = time.time()
         result_image, loss_value, info = scipyOpt.optimize(result_image)
         end_time = time.time()
+        ellapsed_time = (end_time - start_time)
+        total_time += ellapsed_time
+        estimated_time = (total_time/(i+1) * (max_iter-i-1))
         print("New loss value", loss_value)
-        print(", iteration completed in %ds" % (end_time - start_time))
+        print("Iteration completed in %ds" % ellapsed_time)
+        print("Estimated time left : %dm%ds" % (math.floor(estimated_time/60.), estimated_time%60))
 except KeyboardInterrupt:
     pass
 
