@@ -14,20 +14,42 @@ from ScipyOptimizer import ScipyOptimizer
 
 # Computes the content loss value for the content features and result features (both are tensors)
 def content_loss(content_feature, result_feature):
-	return (1/2) * backend.sum(backend.square(content_feature - result_feature))
+    return (1/2) * backend.sum(backend.square(content_feature - result_feature))
+
+
+def gram_matrix(x):
+    features = backend.batch_flatten(backend.permute_dimensions(x, (2, 0, 1)))
+    gram = backend.dot(features, backend.transpose(features))
+    return gram
+
+
+def style_loss(style, combination):
+    S = gram_matrix(style)
+    C = gram_matrix(combination)
+    channels = 3
+    size = height * width
+    return backend.sum(backend.square(S - C)) / (4. * (channels ** 2) * (size ** 2))
+
+
+def total_variation_loss(x):
+    a = backend.square(x[:, :height-1, :width-1, :] - x[:, 1:, :width-1, :])
+    b = backend.square(x[:, :height-1, :width-1, :] - x[:, :height-1, 1:, :])
+    return backend.sum(backend.pow(a + b, 1.25))
 
 
 ##### Parameters
-content_weight = 1
-style_weight = 1
+content_weight = 1 # 0.025
+style_weight = 1 # 5.0
+total_variation_weight = 1.0
 style_path = "../images/picasso.jpg"
 content_path = "../images/elephant.png"
 max_iter = 10
 height = 256
 width = 256
 
-content_layer_name = "block2_conv2";
-style_layers_names = []
+content_layer_name = "block2_conv2"
+style_layers_names = ["block1_conv2", "block2_conv2", "block3_conv3",
+                      "block4_conv3", "block5_conv3"]
 
 
 ##### Images Loading
@@ -60,7 +82,7 @@ style_tensor = backend.constant(style_array)
 result_tensor = backend.placeholder((1, height, width, 3))
 
 # The tensor that will be fed to the VGG19 network
-# The first dimension is used to access the content, style or result image. 
+# The first dimension is used to access the content, style or result image.
 # The remaining dimensions are used to access height, width and color channel, in that order.
 input_tensor = backend.concatenate([content_tensor, style_tensor, result_tensor], axis=0)
 
@@ -74,21 +96,31 @@ model_layers = dict([(layer.name, layer.output) for layer in model.layers])
 loss = backend.variable(0)
 loss += content_weight * content_loss(model_layers[content_layer_name][0, :, :, :], model_layers[content_layer_name][2, :, :, :])
 
+# The Style loss
+for layer_name in style_layers_names:
+    layer_features = model_layers[layer_name]
+    style_features = layer_features[1, :, :, :]
+    combination_features = layer_features[2, :, :, :]
+    sl = style_loss(style_features, combination_features)
+    loss += (style_weight / len(style_layers_names)) * sl
+
+loss += total_variation_weight * total_variation_loss(result_tensor)
+
 
 ###### Generating the result image
 scipyOpt = ScipyOptimizer(loss, result_tensor)
 result_image = np.random.uniform(0, 255, (1, height, width, 3)) - 128
 
 try:
-	for i in range(max_iter):
-	    print("======= Starting iteration %d =======" % (i))
-	    start_time = time.time()
-	    result_image, loss_value, info = scipyOpt.optimize(result_image)
-	    end_time = time.time()
-	    print("New loss value", loss_value, end="")
-	    print(", iteration completed in %ds" % (end_time - start_time))
+    for i in range(max_iter):
+        print("======= Starting iteration %d =======" % (i))
+        start_time = time.time()
+        result_image, loss_value, info = scipyOpt.optimize(result_image)
+        end_time = time.time()
+        print("New loss value", loss_value)
+        print(", iteration completed in %ds" % (end_time - start_time))
 except KeyboardInterrupt:
-	pass
+    pass
 
 
 ###### Showing result image
