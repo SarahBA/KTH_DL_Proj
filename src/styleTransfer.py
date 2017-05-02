@@ -7,24 +7,31 @@ from keras import backend
 from keras.models import Model
 from keras.applications.vgg19 import VGG19
 from scipy.optimize import fmin_l_bfgs_b
+from scipy.misc import imsave
 
 from ScipyOptimizer import ScipyOptimizer
 
 
 ##### Parameters
-content_weight = 1 # 0.05 when 512*512
-style_weight = 10 # 5.0 when 512*512
-regularization = 10 # 1.0 when 512*512 (0 in the original paper) 
-style_path = "../images/scream.jpg"
-content_path = "../images/tubingen.jpg"
-max_iter = 10
-height = 128    # Size of images in the paper : 512*512
-width = 128
+# User defined
+content_weight = 0.0001
+style_weight = 1
+regularization = 1
 
+max_iter = 10
+height = 512    # Size of images in the paper : 512*512
+width = 512
+
+style_path = "../images/inputs/scream.jpg"
+content_path = "../images/inputs/tubingen.jpg"
+result_image_pathprefix = "../images/results/tubingen_scream"
+
+# Network related
 content_layer_name = "block4_conv2"
 style_layers_names = ["block1_conv1", "block2_conv1", "block3_conv1",
                       "block4_conv1", "block5_conv1"]
 style_layers_weights = [0.2, 0.2, 0.2, 0.2, 0.2]     # Must be of the same size as style_layers_names
+meanRGB = [123.68, 116.779, 103.939]
 
 
 ###### Functions definitions
@@ -54,36 +61,44 @@ def total_variation_loss(x):
     return backend.sum(backend.pow(a + b, 1.25))
 
 
+# Transforms an image object into an array ready to be fed to VGG
+def preprocess_image(image):
+    image = image.resize((height, width))
+    array = np.asarray(image, dtype="float32")
+    array = np.expand_dims(array, axis=0) # Expanding dimensions in order to concatenate the images together
+    array[:, :, :, 0] -= meanRGB[0] # Subtracting the mean values
+    array[:, :, :, 1] -= meanRGB[1]
+    array[:, :, :, 2] -= meanRGB[2]
+    array = array[:, :, :, ::-1] # Reordering from RGB to BGR to fit VGG19
+    return array
+
+
+# Transforms an array representing an image into a scipy image object
+def deprocess_array(array):
+    deprocessed_array = np.copy(array)
+    deprocessed_array = deprocessed_array.reshape((height, width, 3))
+    deprocessed_array[:, :, ::-1] # BGR to RGB
+    deprocessed_array[:, :, 0] += meanRGB[0]
+    deprocessed_array[:, :, 1] += meanRGB[1]
+    deprocessed_array[:, :, 2] += meanRGB[2]
+    deprocessed_array = np.clip(deprocessed_array, 0, 255).astype("uint8")
+    image = Image.fromarray(deprocessed_array)
+    return image
+
+
 ##### Images Loading
-meanRGB = [123.68, 116.779, 103.939];
-
 content_image = Image.open(content_path)
-content_image = content_image.resize((height, width))
 style_image = Image.open(style_path)
-style_image = style_image.resize((height, width))
 
-content_array = np.asarray(content_image, dtype="float32")
-content_array = np.expand_dims(content_array, axis=0)		# Expanding dimensions in order to concatenate the images together
-style_array = np.asarray(style_image, dtype="float32")
-style_array =np.expand_dims(style_array, axis=0)
-
-# Transform the input to correspond to what VGG19 wants
-content_array[:, :, :, 0] -= meanRGB[0]
-content_array[:, :, :, 1] -= meanRGB[1]
-content_array[:, :, :, 2] -= meanRGB[2]
-content_array = content_array[:, :, :, ::-1] # Reordering from RGB to BGR to fit VGG19
-
-style_array[:, :, :, 0] -= meanRGB[0]
-style_array[:, :, :, 1] -= meanRGB[1]
-style_array[:, :, :, 2] -= meanRGB[2]
-style_array = style_array[:, :, :, ::-1]
+content_array = preprocess_image(content_image)
+style_array = preprocess_image(style_image)
 
 # Creating placeholders in tensorflow
 content_tensor = backend.constant(content_array)
 style_tensor = backend.constant(style_array)
 result_tensor = backend.placeholder((1, height, width, 3))
 
-# The tensor that will be fed to the VGG19 network
+# The tensor that will be fed to the VGG network
 # The first dimension is used to access the content, style or result image.
 # The remaining dimensions are used to access height, width and color channel, in that order.
 input_tensor = backend.concatenate([content_tensor, style_tensor, result_tensor], axis=0)
@@ -117,18 +132,26 @@ loss += regularization * total_variation_loss(result_tensor)
 
 ###### Generating the result image
 scipyOpt = ScipyOptimizer(loss, result_tensor)
-result_image = np.random.uniform(0, 255, (1, height, width, 3)) - 128
+
+result_array = np.random.uniform(0, 255, (1, height, width, 3)) - 128
+# result_array = np.copy(content_array)
 
 total_time = 0
 try:
     for i in range(max_iter):
         print("======= Starting iteration %d =======" % (i+1))
         start_time = time.time()
-        result_image, loss_value, info = scipyOpt.optimize(result_image)
+        result_array, loss_value, info = scipyOpt.optimize(result_array)
         end_time = time.time()
         ellapsed_time = (end_time - start_time)
         total_time += ellapsed_time
         estimated_time = (total_time/(i+1) * (max_iter-i-1))
+
+        result_image_fullpath = result_image_pathprefix + "_iter_" + str(i+1) + ".png"
+        im = deprocess_array(result_array)
+        print("Saving image for this iteration as %s" % result_image_fullpath)
+        imsave(result_image_fullpath, im)
+
         print("New loss value", loss_value)
         print("Iteration completed in %ds" % ellapsed_time)
         print("Estimated time left : %dm%ds" % (math.floor(estimated_time/60.), estimated_time%60))
@@ -137,13 +160,5 @@ except KeyboardInterrupt:
 
 
 ###### Showing result image
-result_image = result_image.reshape((height, width, 3))
-
-result_image = result_image[:, :, ::-1]
-result_image[:, :, 0] += meanRGB[0]
-result_image[:, :, 1] += meanRGB[1]
-result_image[:, :, 2] += meanRGB[2]
-result_image = np.clip(result_image, 0, 255).astype("uint8")
-
-im = Image.fromarray(result_image)
+im = deprocess_array(result_array)
 im.show()
