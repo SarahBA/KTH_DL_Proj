@@ -5,7 +5,7 @@ import time
 from PIL import Image
 from keras import backend
 from keras.models import Model
-from keras.applications.vgg19 import VGG19
+from keras.applications.vgg16 import VGG16
 from scipy.optimize import fmin_l_bfgs_b
 from scipy.misc import imsave
 
@@ -14,9 +14,9 @@ from ScipyOptimizer import ScipyOptimizer
 
 ##### Parameters
 # User defined
-content_weight = 1
-style_weight = 1000
-regularization = 0
+content_weight = 0.05
+style_weight = 1
+regularization = 1
 
 max_iter = 10
 height = 512    # Size of images in the paper : 512*512
@@ -69,7 +69,7 @@ def preprocess_image(image):
     array[:, :, :, 0] -= meanRGB[0] # Subtracting the mean values
     array[:, :, :, 1] -= meanRGB[1]
     array[:, :, :, 2] -= meanRGB[2]
-    array = array[:, :, :, ::-1] # Reordering from RGB to BGR to fit VGG19
+    array = array[:, :, :, ::-1] # Reordering from RGB to BGR to fit VGG
     return array
 
 
@@ -105,9 +105,8 @@ input_tensor = backend.concatenate([content_tensor, style_tensor, result_tensor]
 
 
 ###### Model Loading
-model = VGG19(input_tensor=input_tensor, weights="imagenet", include_top=False, pooling="avg")
+model = VGG16(input_tensor=input_tensor, weights="imagenet", include_top=False)
 model_layers = dict([(layer.name, layer.output) for layer in model.layers])
-
 
 ###### Defining the total loss function
 loss = backend.variable(0)
