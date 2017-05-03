@@ -15,7 +15,7 @@ from ScipyOptimizer import ScipyOptimizer
 ##### Parameters
 # User defined
 content_weight = 0.05
-style_weight = 1
+style_weight = 5
 regularization = 1
 
 max_iter = 10
@@ -27,9 +27,9 @@ content_path = "../images/inputs/tubingen.jpg"
 result_image_pathprefix = "../images/run/tubingen_scream"
 
 # Network related
-content_layer_name = "block4_conv2"
-style_layers_names = ["block1_conv1", "block2_conv1", "block3_conv1",
-                      "block4_conv1", "block5_conv1"]
+content_layer_name = "block2_conv2"
+style_layers_names = ["block1_conv2", "block2_conv2", "block3_conv3",
+                      "block4_conv3", "block5_conv3"]
 style_layers_weights = [0.2, 0.2, 0.2, 0.2, 0.2]     # Must be of the same size as style_layers_names
 meanRGB = [123.68, 116.779, 103.939]
 init_result_image = "NOISE" # CAN BE : NOISE, STYLE, CONTENT
