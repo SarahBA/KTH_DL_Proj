@@ -14,9 +14,9 @@ from ScipyOptimizer import ScipyOptimizer
 
 ##### Parameters
 # User defined
-content_weight = 0.0001
-style_weight = 1
-regularization = 1
+content_weight = 1
+style_weight = 1000
+regularization = 0
 
 max_iter = 10
 height = 512    # Size of images in the paper : 512*512
@@ -24,7 +24,7 @@ width = 512
 
 style_path = "../images/inputs/scream.jpg"
 content_path = "../images/inputs/tubingen.jpg"
-result_image_pathprefix = "../images/results/tubingen_scream"
+result_image_pathprefix = "../images/run/tubingen_scream"
 
 # Network related
 content_layer_name = "block4_conv2"
@@ -32,7 +32,7 @@ style_layers_names = ["block1_conv1", "block2_conv1", "block3_conv1",
                       "block4_conv1", "block5_conv1"]
 style_layers_weights = [0.2, 0.2, 0.2, 0.2, 0.2]     # Must be of the same size as style_layers_names
 meanRGB = [123.68, 116.779, 103.939]
-
+init_result_image = "NOISE" # CAN BE : NOISE, STYLE, CONTENT
 
 ###### Functions definitions
 
@@ -77,7 +77,7 @@ def preprocess_image(image):
 def deprocess_array(array):
     deprocessed_array = np.copy(array)
     deprocessed_array = deprocessed_array.reshape((height, width, 3))
-    deprocessed_array[:, :, ::-1] # BGR to RGB
+    deprocessed_array = deprocessed_array[:, :, ::-1] # BGR to RGB
     deprocessed_array[:, :, 0] += meanRGB[0]
     deprocessed_array[:, :, 1] += meanRGB[1]
     deprocessed_array[:, :, 2] += meanRGB[2]
@@ -133,9 +133,15 @@ loss += regularization * total_variation_loss(result_tensor)
 ###### Generating the result image
 scipyOpt = ScipyOptimizer(loss, result_tensor)
 
-result_array = np.random.uniform(0, 255, (1, height, width, 3)) - 128
-# result_array = np.copy(content_array)
+# Initializing the result image
+if init_result_image == "STYLE":
+    result_array = np.copy(style_array)
+elif init_result_image == "CONTENT":
+    result_array = np.copy(content_array)
+else:
+    result_array = np.random.uniform(0, 255, (1, height, width, 3)) - 128
 
+# Starting iterations
 total_time = 0
 try:
     for i in range(max_iter):
