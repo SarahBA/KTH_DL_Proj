@@ -91,3 +91,5 @@ ENV/
 #vscode
 src/.vscode/
 images/run/
+
+src/\.idea/
