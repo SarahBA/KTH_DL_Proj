@@ -2,8 +2,8 @@ from PIL import Image
 import math
 import numpy as np
 import time
-from PIL import Image
-from keras import backend
+import glob
+from keras import backend as K
 from keras.models import Model
 from keras.applications.vgg19 import VGG19
 from scipy.optimize import fmin_l_bfgs_b
@@ -11,16 +11,10 @@ from scipy.misc import imsave
 
 from ScipyOptimizer import ScipyOptimizer
 
-
-content_path = "../images/inputs/tubingen.jpg"
+content_paths = [filename.replace('\\', '/') for filename in glob.glob('../images/inputs/input_dir/*.jpg')] 
 
 # Network related
-#content_layer_name = "block4_conv2"
-#style_layers_names = ["block1_conv1", "block2_conv1", "block3_conv1",
- #                     "block4_conv1", "block5_conv1"]
-#style_layers_weights = [0.2, 0.2, 0.2, 0.2, 0.2]     # Must be of the same size as style_layers_names
 meanRGB = [123.68, 116.779, 103.939]
-#init_result_image = "STYLE" # CAN BE : NOISE, STYLE, CONTENT
 width = 512
 height = 512
 
@@ -48,42 +42,39 @@ def deprocess_array(array):
     image = Image.fromarray(deprocessed_array)
     return image
 
+def load_content_array(content_path):
+    content_image = Image.open(content_path)
+    content_array = preprocess_image(content_image)
+    return content_array
 
-##### Images Loading
-content_image = Image.open(content_path)
-
-content_array = preprocess_image(content_image)
-# Creating placeholders in tensorflow
-content_tensor = backend.constant(content_array)
-result_tensor = backend.placeholder((1, height, width, 3))
-
-# The tensor that will be fed to the VGG network
-# The first dimension is used to access the content, style or result image.
-# The remaining dimensions are used to access height, width and color channel, in that order.
-input_tensor = backend.concatenate([content_tensor, result_tensor], axis=0)
-
-from keras import backend as K
+content_arrays = [load_content_array(content_path) for content_path in content_paths]
 
 ###### Model Loading
 model = VGG19(input_tensor=None, weights="imagenet", include_top=False, pooling="avg")
+
 model_layers = dict([(layer.name, layer.output) for layer in model.layers])
-sorted_layers = sorted(model_layers.keys())
-conv_layer_names = [layer for layer in sorted_layers if 'conv' in layer]
+conv_layer_names = [layer for layer in sorted(model_layers.keys()) if 'conv' in layer]
+content_count = len(content_arrays)
 
 for layer_name in conv_layer_names:
     output_layer = model.get_layer(layer_name)
     get_layer_output = K.function([model.layers[0].input],
-                                  [output_layer.output])
-    layer_output = get_layer_output([content_array])[0]
-    #layer_output is 1, 512, 512, 64
-    activation_per_filter = np.sum(layer_output, axis=1)
-    activation_per_filter = np.sum(activation_per_filter, axis=1)
+                                      [output_layer.output])
+    mean_total = 0
+    for content_array in content_arrays:
+        layer_output = get_layer_output([content_array])[0]
+        activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
 
-    #each filter outputs 512x512
-    activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
-    filter_scale_factor = activation_count_per_filter / activation_per_filter
+        #layer_output is 1, 512, 512, 64
+        activation_per_filter = np.sum(layer_output, axis=1)
+        activation_per_filter = np.sum(activation_per_filter, axis=1)
+
+        mean_contribution = 1/content_count * activation_per_filter / activation_count_per_filter
+        mean_total = mean_total + mean_contribution
+
+        #each filter outputs 512x512
+    filter_scale_factor = 1 / mean_total
     filter_scale_factor = filter_scale_factor[0]
-
     layer_weights = output_layer.get_weights()
     #3x3x64
     filter_weights = layer_weights[0]
@@ -96,11 +87,34 @@ for layer_name in conv_layer_names:
     layer_weights[1] = bias_weights_rescaled
     output_layer.set_weights(layer_weights)
 
+#save
+model_json = model.to_json()
+with open("../models/normalized.json", "w") as json_file:
+    json_file.write(model_json)
+# serialize weights to HDF5
+model.save_weights("../models/normalized.h5")
+print("Saved model to disk")
+
 #final evaluation
 output_layer = model.get_layer(layer_name)
 get_layer_output = K.function([model.layers[0].input],
                                   [output_layer.output])
-layer_output = get_layer_output([content_array])[0]
+layer_output = get_layer_output([content_arrays[0]])[0]
+
+#layer_output is 1, 512, 512, 64
+activation_per_filter = np.sum(layer_output, axis=1)
+activation_per_filter = np.sum(activation_per_filter, axis=1)
+
+#each filter outputs 512x512
+activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
+mean_activation = activation_per_filter / activation_count_per_filter
+#should be 64
+print(np.sum(mean_activation))
+
+output_layer = model.get_layer(layer_name)
+get_layer_output = K.function([model.layers[0].input],
+                                  [output_layer.output])
+layer_output = get_layer_output([content_arrays[1]])[0]
 
 #layer_output is 1, 512, 512, 64
 activation_per_filter = np.sum(layer_output, axis=1)
