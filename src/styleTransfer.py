@@ -14,17 +14,17 @@ from ScipyOptimizer import ScipyOptimizer
 
 ##### Parameters
 # User defined
-content_weight = 1
+content_weight = 5
 style_weight = 1000
-regularization = 0
+regularization = 0.1
 
-max_iter = 10
+max_iter = 200
 height = 512    # Size of images in the paper : 512*512
 width = 512
 
-style_path = "../images/inputs/scream.jpg"
+style_path = "../images/inputs/The_Scream.jpg"
 content_path = "../images/inputs/tubingen.jpg"
-result_image_pathprefix = "../images/run/tubingen_scream"
+result_image_pathprefix = "../images/run/b2/tubingen_scream"
 
 # Network related
 content_layer_name = "block4_conv2"

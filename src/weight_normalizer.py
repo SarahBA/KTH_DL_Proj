@@ -48,6 +48,7 @@ def deprocess_array(array):
     image = Image.fromarray(deprocessed_array)
     return image
 
+
 ##### Images Loading
 content_image = Image.open(content_path)
 
@@ -65,37 +66,48 @@ from keras import backend as K
 
 ###### Model Loading
 model = VGG19(input_tensor=None, weights="imagenet", include_top=False, pooling="avg")
-model_layer_outputs = dict([(layer.name, layer.output) for layer in model.layers])
 model_layers = dict([(layer.name, layer.output) for layer in model.layers])
+sorted_layers = sorted(model_layers.keys())
+conv_layer_names = [layer for layer in sorted_layers if 'conv' in layer]
 
-predictions = model.predict(content_array)
-###### Defining the total loss function
-#loss = backend.variable(0)
+for layer_name in conv_layer_names:
+    output_layer = model.get_layer(layer_name)
+    get_layer_output = K.function([model.layers[0].input],
+                                  [output_layer.output])
+    layer_output = get_layer_output([content_array])[0]
+    #layer_output is 1, 512, 512, 64
+    activation_per_filter = np.sum(layer_output, axis=1)
+    activation_per_filter = np.sum(activation_per_filter, axis=1)
 
-# The Content loss
-#loss += content_weight * content_loss(model_layers[content_layer_name][0, :, :, :], model_layers[content_layer_name][2, :, :, :])
+    #each filter outputs 512x512
+    activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
+    filter_scale_factor = activation_count_per_filter / activation_per_filter
+    filter_scale_factor = filter_scale_factor[0]
 
-#loss += style_weight * total_style_loss
+    layer_weights = output_layer.get_weights()
+    #3x3x64
+    filter_weights = layer_weights[0]
+    filter_bias = layer_weights[1]
 
-#get_0rd_layer_output = K.function([model.layers[0].input],
- #                                 [model.layers[1].output])
-get_0rd_layer_output = K.function([model.layers[0].input],
-                                  [model.layers[1].output])
+    filter_weights_rescaled = filter_scale_factor * filter_weights
+    bias_weights_rescaled = filter_scale_factor * filter_bias
 
+    layer_weights[0] = filter_weights_rescaled
+    layer_weights[1] = bias_weights_rescaled
+    output_layer.set_weights(layer_weights)
 
-layer_output = get_0rd_layer_output([content_array])[0]
+#final evaluation
+output_layer = model.get_layer(layer_name)
+get_layer_output = K.function([model.layers[0].input],
+                                  [output_layer.output])
+layer_output = get_layer_output([content_array])[0]
+
 #layer_output is 1, 512, 512, 64
-activation_per_filter = np.sum(layer_output, axis=(1, 2))
+activation_per_filter = np.sum(layer_output, axis=1)
+activation_per_filter = np.sum(activation_per_filter, axis=1)
+
 #each filter outputs 512x512
 activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
 mean_activation = activation_per_filter / activation_count_per_filter
-#1x64
-filter_scale_factor = 1 / mean_activation
-#total_count = layer_output.size
-layer_weights = model.layers[1].get_weights()
-#3x3x64
-filter_weights = layer_weights[0]
-
-filter_weights_rescaled = filter_weights * filter_scale_factor
-layer_weights[0] = filter_weights_rescaled
-model.layers[1].set_weights(layer_weights)
+#should be 64
+print(np.sum(mean_activation))
