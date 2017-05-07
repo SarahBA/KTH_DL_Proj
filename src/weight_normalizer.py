@@ -11,7 +11,7 @@ from scipy.misc import imsave
 
 from ScipyOptimizer import ScipyOptimizer
 
-content_paths = [filename.replace('\\', '/') for filename in glob.glob('../images/inputs/input_dir/*.jpg')] 
+content_paths = [filename.replace('\\', '/') for filename in glob.glob('d:/DeepLearning/Data/ILSVRC2012_img_val/*.JPEG')] 
 
 # Network related
 meanRGB = [123.68, 116.779, 103.939]
@@ -22,7 +22,11 @@ height = 512
 def preprocess_image(image):
     image = image.resize((height, width))
     array = np.asarray(image, dtype="float32")
+    if (len(array.shape) != 3):
+        new_array = np.expand_dims(array, axis=3)
+        array = np.tile(new_array, 3)
     array = np.expand_dims(array, axis=0) # Expanding dimensions in order to concatenate the images together
+    
     array[:, :, :, 0] -= meanRGB[0] # Subtracting the mean values
     array[:, :, :, 1] -= meanRGB[1]
     array[:, :, :, 2] -= meanRGB[2]
@@ -86,6 +90,7 @@ for layer_name in conv_layer_names:
     layer_weights[0] = filter_weights_rescaled
     layer_weights[1] = bias_weights_rescaled
     output_layer.set_weights(layer_weights)
+    print("Layer completed: " + layer_name)
 
 #save
 model_json = model.to_json()
