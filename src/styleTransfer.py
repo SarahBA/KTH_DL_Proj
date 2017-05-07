@@ -16,8 +16,8 @@ from ScipyOptimizer import ScipyOptimizer
 # User defined
 content_weight = 5
 style_weight = 1000
-regularizations = [0.0001, 0.001, 0.01, 0.1, 0.5, 1]
-counter = 3
+regularizations = [0]
+counter = 0
 for regularization in regularizations:
     counter = counter + 1
     max_iter = 200
