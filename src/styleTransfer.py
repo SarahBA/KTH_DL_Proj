@@ -14,13 +14,13 @@ from ScipyOptimizer import ScipyOptimizer
 
 ##### Parameters
 # User defined
-content_weights = [5, 5]
-style_weights = [10000, 10000]
-content_paths = ["../images/inputs/tubingen.jpg", "../images/inputs/tubingen.jpg"]
-style_paths = ["../images/inputs/Femme nue assise.jpg", "../images/inputs/Composition VII.jpg"]
-result_paths = ["tubingen_femme", "tubingen_composition"]
-regularizations = [0]
-counter = 5
+content_weights = [5]
+style_weights = [1000]
+content_paths = ["../images/inputs/tubingen.jpg"]
+style_paths = ["../images/inputs/Der Schrei.jpg"]
+result_paths = ["tubingen_scream"]
+regularizations = [100]
+counter = 8
 for regularization in regularizations:
     for content_weight, style_weight, content_path, style_path, result_path_base_name in zip(content_weights, style_weights, content_paths, style_paths, result_paths):
         counter = counter + 1
