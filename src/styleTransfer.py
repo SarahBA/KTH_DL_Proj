@@ -14,20 +14,23 @@ from ScipyOptimizer import ScipyOptimizer
 
 ##### Parameters
 # User defined
-content_weights = [1, 5, 1]
-style_weights = [100, 100, 1000]
+content_weights = [5, 5]
+style_weights = [10000, 10000]
+content_paths = ["../images/inputs/tubingen.jpg", "../images/inputs/tubingen.jpg"]
+style_paths = ["../images/inputs/Femme nue assise.jpg", "../images/inputs/Composition VII.jpg"]
+result_paths = ["tubingen_femme", "tubingen_composition"]
 regularizations = [0]
-counter = 9
+counter = 5
 for regularization in regularizations:
-    for content_weight, style_weight in zip(content_weights, style_weights):
+    for content_weight, style_weight, content_path, style_path, result_path_base_name in zip(content_weights, style_weights, content_paths, style_paths, result_paths):
         counter = counter + 1
         max_iter = 200
         height = 512    # Size of images in the paper : 512*512
         width = 512
 
-        style_path = "../images/inputs/The_Scream.jpg"
-        content_path = "../images/inputs/tubingen.jpg"
-        result_image_pathprefix = "../images/run/b" + str(counter) + "/tubingen_scream"
+       # style_path = "../images/inputs/The_Scream.jpg"
+       # content_path = "../images/inputs/tubingen.jpg"
+        result_image_pathprefix = "../images/run/b" + str(counter) + "/" + result_path_base_name
 
         # Network related
         content_layer_name = "block4_conv2"
@@ -109,6 +112,8 @@ for regularization in regularizations:
 
         ###### Model Loading
         model = VGG19(input_tensor=input_tensor, weights="imagenet", include_top=False, pooling="avg")
+      #
+      #   model.load_weights("../models/normalized.h5")
         model_layers = dict([(layer.name, layer.output) for layer in model.layers])
 
 

@@ -8,8 +8,9 @@ from keras.models import Model
 from keras.applications.vgg19 import VGG19
 from scipy.optimize import fmin_l_bfgs_b
 from scipy.misc import imsave
-
+import gc
 from ScipyOptimizer import ScipyOptimizer
+from datetime import datetime
 
 content_paths = [filename.replace('\\', '/') for filename in glob.glob('d:/DeepLearning/Data/ILSVRC2012_img_val/*.JPEG')] 
 
@@ -22,7 +23,7 @@ height = 512
 def preprocess_image(image):
     image = image.resize((height, width))
     array = np.asarray(image, dtype="float32")
-    if (len(array.shape) != 3):
+    if len(array.shape) != 3:
         new_array = np.expand_dims(array, axis=3)
         array = np.tile(new_array, 3)
     array = np.expand_dims(array, axis=0) # Expanding dimensions in order to concatenate the images together
@@ -47,36 +48,66 @@ def deprocess_array(array):
     return image
 
 def load_content_array(content_path):
+    if "000.JPEG" in content_path:
+        print(content_path + ', time ' + str(datetime.now()))
+
     content_image = Image.open(content_path)
+    if content_image.mode == 'CMYK':
+        content_image = content_image.convert('RGB')
+
     content_array = preprocess_image(content_image)
     return content_array
-
-content_arrays = [load_content_array(content_path) for content_path in content_paths]
 
 ###### Model Loading
 model = VGG19(input_tensor=None, weights="imagenet", include_top=False, pooling="avg")
 
 model_layers = dict([(layer.name, layer.output) for layer in model.layers])
 conv_layer_names = [layer for layer in sorted(model_layers.keys()) if 'conv' in layer]
-content_count = len(content_arrays)
+content_count = len(content_paths)
 
+batch_size = 13000
+batches = (len(content_paths) + batch_size - 1) // batch_size
+first_initialized = False
+batch_direction = -1
 for layer_name in conv_layer_names:
     output_layer = model.get_layer(layer_name)
     get_layer_output = K.function([model.layers[0].input],
-                                      [output_layer.output])
+                                   [output_layer.output])
     mean_total = 0
-    for content_array in content_arrays:
-        layer_output = get_layer_output([content_array])[0]
-        activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
+    item_counter = 0
+    if first_initialized == False:
+        content_arrays = []
+#    content_arrays2 = []
+    batch_direction = -1 * batch_direction
+    first_batch = True
+    for batch in range(1, batches + 1):
+        if batch > 1:
+            first_batch = False
+        if batch_direction == -1:
+            batch = batches - batch + 1
+        print('layer '+ layer_name + ', batch ' + str(batch) + ', time ' +  str(datetime.now()))
+        if first_batch and not first_initialized:
+            del content_arrays
+            gc.collect()
+            content_arrays = [load_content_array(content_path) for content_path in content_paths[(batch - 1)*batch_size: batch * batch_size]]
+        elif not first_batch:
+            del content_arrays
+            gc.collect()
+            content_arrays = [load_content_array(content_path) for content_path in content_paths[(batch - 1)*batch_size: batch * batch_size]]
 
-        #layer_output is 1, 512, 512, 64
-        activation_per_filter = np.sum(layer_output, axis=1)
-        activation_per_filter = np.sum(activation_per_filter, axis=1)
-
-        mean_contribution = 1/content_count * activation_per_filter / activation_count_per_filter
-        mean_total = mean_total + mean_contribution
-
-        #each filter outputs 512x512
+        first_initialized = True
+#        content_arrays2 = content_arrays
+#        for content_array in content_arrays2:
+        for content_array in content_arrays:
+            item_counter = item_counter + 1
+            layer_output = get_layer_output([content_array])[0]
+            activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
+            #layer_output is 1, 512, 512, 64
+            activation_per_filter = np.sum(layer_output, axis=1)
+            activation_per_filter = np.sum(activation_per_filter, axis=1)
+            mean = activation_per_filter / activation_count_per_filter
+            mean_total = mean_total + (mean - mean_total) / item_counter
+            #each filter outputs 512x512
     filter_scale_factor = 1 / mean_total
     filter_scale_factor = filter_scale_factor[0]
     layer_weights = output_layer.get_weights()
@@ -94,10 +125,10 @@ for layer_name in conv_layer_names:
 
 #save
 model_json = model.to_json()
-with open("../models/normalized.json", "w") as json_file:
+with open("../models/normalized2.json", "w") as json_file:
     json_file.write(model_json)
 # serialize weights to HDF5
-model.save_weights("../models/normalized.h5")
+model.save_weights("../models/normalized2.h5")
 print("Saved model to disk")
 
 #final evaluation
