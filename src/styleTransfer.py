@@ -36,9 +36,9 @@ parser.add_argument('-o', '--output', type=str, required=False, default='./resul
 parser.add_argument('-cl', '--content-layer', type=str, required=False, default='block4_conv2',
 					help='the name of the layer to use for the content function')
 parser.add_argument('-sl', '--style-layers', type=str, nargs='+', required=False,
-					default=['block1_conv2', 'block2_conv2', 'block3_conv3', 'block4_conv3', 'block5_conv3'],
+					default=['block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1', 'block5_conv1'],
 					help='the name of the layers to use for the style function')
-parser.add_argument('-m', '--model', type=str, required=False, default='VGG16',
+parser.add_argument('-m', '--model', type=str, required=False, default='VGG19',
 					help='the CNN to use (can be VGG16 or VGG19)')
 
 
@@ -115,7 +115,7 @@ def main(args):
 
 	model_name = args.model
 	if model_name != 'VGG16' or model_name != 'VGG19':
-		model_name = 'VGG16'
+		model_name = 'VGG19'
 
 	init_result_image = args.init
 	if init_result_image != 'style' or init_result_image != 'content' or init_result_image != 'noise':
