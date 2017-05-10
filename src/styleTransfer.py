@@ -123,6 +123,8 @@ def main(args):
 	print('\nRunning for maximum %d iterations' % max_iter)
 	print('Using %s network' % model_name)
 	print('with content_weight = %d    style_weight = %d    regularization = %d' %(content_weight, style_weight, regularization))
+	print('Content layer is %s' % content_layer_name)
+	print('Style layers are %s' % style_layers_names)
 	print('Image size of %dx%dpx, initialization strategy is %s \n' % (height, width, init_result_image))
 
 
