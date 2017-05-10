@@ -5,6 +5,7 @@ import time
 from PIL import Image
 from keras import backend
 from keras.models import Model
+from keras.applications.vgg16 import VGG16
 from keras.applications.vgg19 import VGG19
 from scipy.optimize import fmin_l_bfgs_b
 from scipy.misc import imsave
@@ -35,9 +36,9 @@ parser.add_argument('-o', '--output', type=str, required=False, default='./resul
 parser.add_argument('-cl', '--content-layer', type=str, required=False, default='block4_conv2',
 					help='the name of the layer to use for the content function')
 parser.add_argument('-sl', '--style-layers', type=str, nargs='+', required=False,
-					default=['block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1', 'block5_conv1'],
+					default=['block1_conv2', 'block2_conv2', 'block3_conv3', 'block4_conv3', 'block5_conv3'],
 					help='the name of the layers to use for the style function')
-parser.add_argument('-m', '--model', type=str, required=False, default='VGG19',
+parser.add_argument('-m', '--model', type=str, required=False, default='VGG16',
 					help='the CNN to use (can be VGG16 or VGG19)')
 
 
@@ -114,7 +115,7 @@ def main(args):
 
 	model_name = args.model
 	if model_name != 'VGG16' or model_name != 'VGG19':
-		model_name = 'VGG19'
+		model_name = 'VGG16'
 
 	init_result_image = args.init
 	if init_result_image != 'style' or init_result_image != 'content' or init_result_image != 'noise':
@@ -122,7 +123,7 @@ def main(args):
 
 	print('\nRunning for maximum %d iterations' % max_iter)
 	print('Using %s network' % model_name)
-	print('with content_weight = %d    style_weight = %d    regularization = %d' %(content_weight, style_weight, regularization))
+	print('with content_weight = %5.3f    style_weight = %d    regularization = %3.1f' %(content_weight, style_weight, regularization))
 	print('Content layer is %s' % content_layer_name)
 	print('Style layers are %s' % style_layers_names)
 	print('Image size of %dx%dpx, initialization strategy is %s \n' % (height, width, init_result_image))
