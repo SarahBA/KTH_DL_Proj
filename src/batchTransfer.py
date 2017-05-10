@@ -5,12 +5,12 @@ import os
 # The batch script will simply run the style transfer algorithm will the parameters
 # extracted from the first indexes of the arrays, then the second, etc...
 
-content_weights = [1, 5]
-style_weights = [100, 100]
-content_paths = ["../images/inputs/tubingen.jpg", "../images/inputs/tubingen.jpg"]
+content_weights = [5, 5]
+style_weights = [1000, 1000]
+content_paths = ["../images/inputs/stockholm.jpg", "../images/inputs/stockholm.jpg"]
 style_paths = ["../images/inputs/Femme_nue_assise.jpg", "../images/inputs/Composition_VII.jpg"]
-result_prefixes = ["tubingen_femme", "tubingen_composition"]
-regularizations = [0, 0]
+result_prefixes = ["stockholm_femme", "stockholm_composition"]
+regularizations = [10, 10]
 
 # Batch parameters
 number_iterations = 200
