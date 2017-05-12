@@ -5,6 +5,7 @@ import time
 from PIL import Image
 from keras import backend
 from keras.models import Model
+from keras.applications.vgg16 import VGG16
 from keras.applications.vgg19 import VGG19
 from scipy.optimize import fmin_l_bfgs_b
 from scipy.misc import imsave
@@ -123,7 +124,7 @@ def main(args):
 
 	print('\nRunning for maximum %d iterations' % max_iter)
 	print('Using %s network' % model_name)
-	print('with content_weight = %d    style_weight = %d    regularization = %d' %(content_weight, style_weight, regularization))
+	print('with content_weight = %5.3f    style_weight = %d    regularization = %3.1f' %(content_weight, style_weight, regularization))
 	print('Content layer is %s' % content_layer_name)
 	print('Style layers are %s' % style_layers_names)
 	print('Style layers weights are %s' % style_layers_weights)
