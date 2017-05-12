@@ -8,8 +8,8 @@ import os
 content_weights = [0.025, 0.025]
 style_weights = [5, 5]
 content_paths = ["../images/inputs/stockholm.jpg", "../images/inputs/stockholm.jpg"]
-style_paths = ["../images/inputs/waves.png", "../images/inputs/chaos.jpg"]
-result_prefixes = ["stockholm_waves", "stockholm_chaos"]
+style_paths = ["../images/inputs/Femme_nue_assise.jpg", "../images/inputs/Composition_VII.jpg"]
+result_prefixes = ["stockholm_femme", "stockholm_composition"]
 regularizations = [0.1, 0.1]
 
 # Batch parameters
