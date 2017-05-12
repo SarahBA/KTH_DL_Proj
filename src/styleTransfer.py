@@ -42,7 +42,6 @@ parser.add_argument('-m', '--model', type=str, required=False, default='VGG19',
 
 
 ##### Hard Coded Parameters
-style_layers_weights = [0.2, 0.2, 0.2, 0.2, 0.2]     # Must be of the same size as style_layers_names
 meanRGB = [123.68, 116.779, 103.939]
 
 ###### Functions definitions
@@ -120,11 +119,14 @@ def main(args):
 	if init_result_image != 'style' or init_result_image != 'content' or init_result_image != 'noise':
 		init_result_image = 'noise'
 
+	style_layers_weights = [1.0/len(style_layers_names) for i in range(len(style_layers_names))]
+
 	print('\nRunning for maximum %d iterations' % max_iter)
 	print('Using %s network' % model_name)
 	print('with content_weight = %d    style_weight = %d    regularization = %d' %(content_weight, style_weight, regularization))
 	print('Content layer is %s' % content_layer_name)
 	print('Style layers are %s' % style_layers_names)
+	print('Style layers weights are %s' % style_layers_weights)
 	print('Image size of %dx%dpx, initialization strategy is %s \n' % (height, width, init_result_image))
 
 
