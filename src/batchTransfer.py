@@ -5,12 +5,12 @@ import os
 # The batch script will simply run the style transfer algorithm will the parameters
 # extracted from the first indexes of the arrays, then the second, etc...
 
-content_weights = [0.025, 0.025]
-style_weights = [5, 5]
+content_weights = [5,5]
+style_weights = [1000,1000]
 content_paths = ["../images/inputs/stockholm.jpg", "../images/inputs/stockholm.jpg"]
 style_paths = ["../images/inputs/Femme_nue_assise.jpg", "../images/inputs/Composition_VII.jpg"]
 result_prefixes = ["stockholm_femme", "stockholm_composition"]
-regularizations = [0.1, 0.1]
+regularizations = [10,10]
 
 # Batch parameters
 number_iterations = 200
@@ -21,4 +21,4 @@ batch_number = 5
 for content_weight, style_weight, content_path, style_path, result_prefix, regularization in zip(content_weights, style_weights, content_paths, style_paths, result_prefixes, regularizations):
 		batch_number += 1
 		batch_output_path = batch_output_base_path + str(batch_number) + '_' + result_prefix
-		os.system('python3 ./styleTransfer.py -c %s -s %s -o %s -sw %d -cw %5.3f -rw %3.1f -mi %d --model %s -cl %s -sl %s' % (content_path, style_path, batch_output_path, style_weight, content_weight, regularization, number_iterations, "VGG16", "block2_conv2", "'block1_conv2' 'block2_conv2' 'block3_conv3' 'block4_conv3' 'block5_conv3'"))
+		os.system('python3 ./styleTransfer.py -c %s -s %s -o %s -sw %d -cw %5.3f -rw %3.1f -mi %d -cl %s' % (content_path, style_path, batch_output_path, style_weight, content_weight, regularization, number_iterations, "block2_conv2"))
