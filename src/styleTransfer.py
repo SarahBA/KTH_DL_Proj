@@ -1,3 +1,5 @@
+# Implementation of the style transfer algorithm as per report description.
+
 from PIL import Image
 import math
 import numpy as np
@@ -157,7 +159,6 @@ def main(args):
 	#
 	#   model.load_weights("../models/normalized.h5")
 	model_layers = dict([(layer.name, layer.output) for layer in model.layers])
-
 
 	###### Defining the total loss function
 	loss = backend.variable(0)

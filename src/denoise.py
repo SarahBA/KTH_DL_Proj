@@ -1,4 +1,5 @@
 # Source : http://www.askaswiss.com/2016/12/how-to-denoise-images-in-python.html
+# Total Variation denoising algorithm (as postprocessing)
 
 import numpy as np
 

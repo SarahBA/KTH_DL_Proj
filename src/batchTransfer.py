@@ -1,3 +1,5 @@
+# Runs the style transfer algorithm multiple times for the specified parameters
+
 import os
 
 # Network parameters

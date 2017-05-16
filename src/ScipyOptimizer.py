@@ -1,11 +1,12 @@
-import numpy as np
-from keras import backend
-from scipy.optimize import fmin_l_bfgs_b
-
 # This class acts as an interface between tensorflow and scipy's L-BFGS-B optimizer.
 # Scipy performing two separate calls in order to get the loss and the gradient,
 # this class also provides some memorization mechanism, allowing to call keras
 # only one time, evaluating both the loss and the gradient at the same time.
+
+import numpy as np
+from keras import backend
+from scipy.optimize import fmin_l_bfgs_b
+
 class ScipyOptimizer:
 
 	# loss is the tensorflow-defined loss function to minimize
