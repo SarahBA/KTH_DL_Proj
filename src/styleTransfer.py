@@ -122,7 +122,6 @@ def getlaplacian(i_arr: np.ndarray, consts: np.ndarray, epsilon: float = 0.00000
 def total_photo_loss(result_tensor, height, width, laplaciantensor):	
 	content_array_mult = backend.reshape(result_tensor[:, :, :, 0], (width * height, 1))
 	tftensor2 = content_array_mult
-#	tftensor2 = backend.constant(content_array_mult)
 	multiplied = tf.sparse_tensor_dense_matmul(laplaciantensor, tftensor2)
 	content_array_mult_2 = backend.transpose(tftensor2)
 	multiplied2 = backend.dot(content_array_mult_2, multiplied)
@@ -134,9 +133,9 @@ def preprocess_image(image, height, width):
     image = image.resize((height, width))
     array = np.asarray(image, dtype="float32")
     array = np.expand_dims(array, axis=0) # Expanding dimensions in order to concatenate the images together
-    #array[:, :, :, 0] -= meanRGB[0] # Subtracting the mean values
-    #array[:, :, :, 1] -= meanRGB[1]
-    #array[:, :, :, 2] -= meanRGB[2]
+    array[:, :, :, 0] -= meanRGB[0] # Subtracting the mean values
+    array[:, :, :, 1] -= meanRGB[1]
+    array[:, :, :, 2] -= meanRGB[2]
     array = array[:, :, :, ::-1] # Reordering from RGB to BGR to fit VGG19
     return array
 
@@ -146,9 +145,9 @@ def deprocess_array(array, height, width):
     deprocessed_array = np.copy(array)
     deprocessed_array = deprocessed_array.reshape((height, width, 3))
     deprocessed_array = deprocessed_array[:, :, ::-1] # BGR to RGB
-    #deprocessed_array[:, :, 0] += meanRGB[0]
-    #deprocessed_array[:, :, 1] += meanRGB[1]
-    #deprocessed_array[:, :, 2] += meanRGB[2]
+    deprocessed_array[:, :, 0] += meanRGB[0]
+    deprocessed_array[:, :, 1] += meanRGB[1]
+    deprocessed_array[:, :, 2] += meanRGB[2]
     deprocessed_array = np.clip(deprocessed_array, 0, 255).astype("uint8")
     image = Image.fromarray(deprocessed_array)
     return image
