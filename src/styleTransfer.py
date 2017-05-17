@@ -217,7 +217,7 @@ def main(args):
 		model = VGG16(input_tensor=input_tensor, weights="imagenet", include_top=False)
 	else:
 		model = VGG19(input_tensor=input_tensor, weights="imagenet", include_top=False, pooling="avg")
-		model.load_weights("../models/normalized.h5")
+		#model.load_weights("../models/normalized.h5")
 
 	#
 	#   model.load_weights("../models/normalized.h5")
