@@ -9,10 +9,10 @@ import os
 
 content_weights = [5]
 style_weights = [1000]
-content_paths = ["../images/inputs/tubingen.jpg"]
-style_paths = ["../images/inputs/scream.jpg"]
-result_prefixes = ["tubingen_scream"]
-regularizations = [10000]
+content_paths = ["../images/inputs/white-pine-lake-cloudy-reflection.jpg"]
+style_paths = ["../images/inputs/maxresdefault.jpg"]
+result_prefixes = ["adobe_lake"]
+regularizations = [10]
 
 # Batch parameters
 number_iterations = 200
