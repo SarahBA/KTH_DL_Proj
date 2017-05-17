@@ -2,36 +2,40 @@ from PIL import Image
 import math
 import numpy as np
 import time
-from PIL import Image
 from keras import backend
 from keras.models import Model
 from keras.applications.vgg16 import VGG16
-from keras.applications.vgg19 import VGG19
+from vgg19_loader import VGG19
+#from keras.applications.vgg19 import VGG19
 from scipy.optimize import fmin_l_bfgs_b
 from scipy.misc import imsave
 import argparse
-
+import scipy
+import scipy.misc as spm
+import scipy.ndimage as spi
+import scipy.sparse as sps
+import tensorflow as tf
 from ScipyOptimizer import ScipyOptimizer
 
 ##### Arguments definition
 parser = argparse.ArgumentParser(description='Apply the style of an image onto another one.',
 								 usage = 'styleTransfer.py -s <style_image> -c <content_image>')
 
-parser.add_argument('-s', '--style-img', type=str, required=True, help='image to use as style')
-parser.add_argument('-c', '--content-img', type=str, required=True, help='image to use as content')
-parser.add_argument('-mi', '--max-iter', type=int, required=False, default=10,
+parser.add_argument('-s', '--style-img', type=str, required=False, help='image to use as style', default="../images/inputs/Der_Schrei.jpg")
+parser.add_argument('-c', '--content-img', type=str, required=False, help='image to use as content', default="../images/inputs/tubingen.jpg")
+parser.add_argument('-mi', '--max-iter', type=int, required=False, default=200,
 					help='the maximum number of iterations for generating the result image')
 parser.add_argument('-sw', '--style-weight', type=float, required=False, default=1000,
 					help='weight of the style when generating the image')
 parser.add_argument('-cw', '--content-weight', type=float, required=False, default=5,
 					help='weight of the content when generating the image')
-parser.add_argument('-rw', '--reg-weight', type=float, required=False, default=1,
+parser.add_argument('-rw', '--reg-weight', type=float, required=False, default=0,
 					help='weight of the noise elimination when generating the image')
 parser.add_argument('-i', '--init', type=str, required=False, default='noise',
 					help='initialization strategy (can be content, style, or noise)')
 parser.add_argument('--size', type=int, required=False, default=512,
 					help='size of the result image in pixels (height and width are set to the same value)')
-parser.add_argument('-o', '--output', type=str, required=False, default='./result_',
+parser.add_argument('-o', '--output', type=str, required=False, default='../images/run/b13/result_photo_',
 					help='define the base path and name for the generated result images')
 parser.add_argument('-cl', '--content-layer', type=str, required=False, default='block4_conv2',
 					help='the name of the layer to use for the content function')
@@ -44,7 +48,7 @@ parser.add_argument('-m', '--model', type=str, required=False, default='VGG19',
 
 ##### Hard Coded Parameters
 meanRGB = [123.68, 116.779, 103.939]
-
+use_photo_loss = False
 ###### Functions definitions
 
 # Computes the content loss value for the content features and result features (both are tensors)
@@ -72,14 +76,65 @@ def total_variation_loss(x, height, width):
     return backend.sum(backend.pow(a + b, 1.25))
 
 
+def rolling_block(A, block=(3, 3)):
+    shape = (A.shape[0] - block[0] + 1, A.shape[1] - block[1] + 1) + block
+    strides = (A.strides[0], A.strides[1]) + A.strides
+    return as_strided(A, shape=shape, strides=strides)
+
+def getlaplacian(i_arr: np.ndarray, consts: np.ndarray, epsilon: float = 0.0000001, win_size: int = 1):
+    neb_size = (win_size * 2 + 1) ** 2
+    h, w, c = i_arr.shape
+    img_size = w * h
+    consts = spi.morphology.grey_erosion(consts, footprint=np.ones(shape=(win_size * 2 + 1, win_size * 2 + 1)))
+    indsM = np.reshape(np.array(range(img_size)), newshape=(h, w), order='F')
+    tlen = int((-consts[win_size:-win_size, win_size:-win_size] + 1).sum() * (neb_size ** 2))
+    row_inds = np.zeros(tlen)
+    col_inds = np.zeros(tlen)
+    vals = np.zeros(tlen)
+    l = 0
+    for j in range(win_size, w - win_size):
+        for i in range(win_size, h - win_size):
+            if consts[i, j]:
+                continue
+            win_inds = indsM[i - win_size:i + win_size + 1, j - win_size: j + win_size + 1]
+            win_inds = win_inds.ravel(order='F')
+            win_i = i_arr[i - win_size:i + win_size + 1, j - win_size: j + win_size + 1, :]
+            win_i = win_i.reshape((neb_size, c), order='F')
+            win_mu = np.mean(win_i, axis=0).reshape(1, win_size * 2 + 1)
+            win_var = np.linalg.inv(np.matmul(win_i.T, win_i) / neb_size - np.matmul(win_mu.T, win_mu) + epsilon / neb_size * np.identity(c))
+            win_i2 = win_i - win_mu
+            tvals = (1 + np.matmul(np.matmul(win_i2, win_var), win_i2.T)) / neb_size
+            ind_mat = np.broadcast_to(win_inds, (neb_size, neb_size))
+            row_inds[l: (neb_size ** 2 + l)] = ind_mat.ravel(order='C')
+            col_inds[l: neb_size ** 2 + l] = ind_mat.ravel(order='F')
+            vals[l: neb_size ** 2 + l] = tvals.ravel(order='F')
+            l += neb_size ** 2
+    vals = vals.ravel(order='F')
+    row_inds = row_inds.ravel(order='F')
+    col_inds = col_inds.ravel(order='F')
+    a_sparse = sps.csr_matrix((vals, (row_inds, col_inds)), shape=(img_size, img_size), dtype="float32")
+    sum_a = a_sparse.sum(axis=1).T.tolist()[0]
+    a_sparse = sps.diags([sum_a], [0], shape=(img_size, img_size), dtype="float32") - a_sparse
+    return a_sparse
+
+def total_photo_loss(result_tensor, height, width, laplaciantensor):	
+	content_array_mult = backend.reshape(result_tensor[:, :, :, 0], (width * height, 1))
+	tftensor2 = content_array_mult
+#	tftensor2 = backend.constant(content_array_mult)
+	multiplied = tf.sparse_tensor_dense_matmul(laplaciantensor, tftensor2)
+	content_array_mult_2 = backend.transpose(tftensor2)
+	multiplied2 = backend.dot(content_array_mult_2, multiplied)
+	return backend.sum(multiplied2)
+
+
 # Transforms an image object into an array ready to be fed to VGG
 def preprocess_image(image, height, width):
     image = image.resize((height, width))
     array = np.asarray(image, dtype="float32")
     array = np.expand_dims(array, axis=0) # Expanding dimensions in order to concatenate the images together
-    array[:, :, :, 0] -= meanRGB[0] # Subtracting the mean values
-    array[:, :, :, 1] -= meanRGB[1]
-    array[:, :, :, 2] -= meanRGB[2]
+    #array[:, :, :, 0] -= meanRGB[0] # Subtracting the mean values
+    #array[:, :, :, 1] -= meanRGB[1]
+    #array[:, :, :, 2] -= meanRGB[2]
     array = array[:, :, :, ::-1] # Reordering from RGB to BGR to fit VGG19
     return array
 
@@ -89,12 +144,20 @@ def deprocess_array(array, height, width):
     deprocessed_array = np.copy(array)
     deprocessed_array = deprocessed_array.reshape((height, width, 3))
     deprocessed_array = deprocessed_array[:, :, ::-1] # BGR to RGB
-    deprocessed_array[:, :, 0] += meanRGB[0]
-    deprocessed_array[:, :, 1] += meanRGB[1]
-    deprocessed_array[:, :, 2] += meanRGB[2]
+    #deprocessed_array[:, :, 0] += meanRGB[0]
+    #deprocessed_array[:, :, 1] += meanRGB[1]
+    #deprocessed_array[:, :, 2] += meanRGB[2]
     deprocessed_array = np.clip(deprocessed_array, 0, 255).astype("uint8")
     image = Image.fromarray(deprocessed_array)
     return image
+
+def img_to_double(image):
+    return image / 255.0
+
+def convert_sparse_matrix_to_sparse_tensor(X):
+    coo = X.tocoo()
+    indices = np.mat([coo.row, coo.col]).transpose()
+    return tf.SparseTensor(indices, coo.data, coo.shape)
 
 # Main function
 def main(args):
@@ -105,7 +168,7 @@ def main(args):
 	content_weight = args.content_weight
 	style_weight = args.style_weight
 	regularization = args.reg_weight
-
+	photo_weight = 10000
 	height = args.size
 	width = args.size
 	result_image_pathprefix = args.output
@@ -153,6 +216,7 @@ def main(args):
 		model = VGG16(input_tensor=input_tensor, weights="imagenet", include_top=False)
 	else:
 		model = VGG19(input_tensor=input_tensor, weights="imagenet", include_top=False, pooling="avg")
+		model.load_weights("../models/normalized.h5")
 
 	#
 	#   model.load_weights("../models/normalized.h5")
@@ -178,7 +242,14 @@ def main(args):
 
 	# Regularization of the result image
 	loss += regularization * total_variation_loss(result_tensor, height, width)
+	#Add photo loss regularization term
+	if use_photo_loss:
+		content_array_l = img_to_double(content_array)
+		content_array_l = content_array[0, :, :, :]
+		laplacian = getlaplacian(content_array_l, np.zeros(shape=(height, width)), 1e-7, 1)
+		laplaciantensor = convert_sparse_matrix_to_sparse_tensor(laplacian)
 
+		loss += photo_weight * total_photo_loss(result_tensor, height, width, laplaciantensor)
 
 	###### Generating the result image
 	scipyOpt = ScipyOptimizer(loss, result_tensor)
