@@ -12,7 +12,7 @@ style_weights = [1000]
 content_paths = ["../images/inputs/tubingen.jpg"]
 style_paths = ["../images/inputs/scream.jpg"]
 result_prefixes = ["tubingen_scream"]
-regularizations = [1000]
+regularizations = [10000]
 
 # Batch parameters
 number_iterations = 200
