@@ -1,3 +1,5 @@
+# Runs the style transfer algorithm multiple times for the specified parameters
+
 import os
 
 # Network parameters
@@ -5,12 +7,12 @@ import os
 # The batch script will simply run the style transfer algorithm will the parameters
 # extracted from the first indexes of the arrays, then the second, etc...
 
-content_weights = [5,5]
-style_weights = [1000,1000]
-content_paths = ["../images/inputs/tubingen.jpg", "../images/inputs/tubingen.jpg"]
-style_paths = ["../images/inputs/scream.jpg", "../images/inputs/scream.jpg"]
-result_prefixes = ["tubingen_scream", "tubingen_scream"]
-regularizations = [100,500]
+content_weights = [5]
+style_weights = [1000]
+content_paths = ["../images/inputs/tubingen.jpg"]
+style_paths = ["../images/inputs/scream.jpg"]
+result_prefixes = ["tubingen_scream"]
+regularizations = [1000]
 
 # Batch parameters
 number_iterations = 200
