@@ -1,5 +1,5 @@
-# Normalizes the weights in the VGG19 network (see report for more details)
-
+# Normalizes the weights in the VGG19 network by running through the images in the
+# ILSVRC2012 validation set in batches, capturing the activation, and normalizing the output
 from PIL import Image
 import math
 import numpy as np
@@ -14,6 +14,7 @@ import gc
 from ScipyOptimizer import ScipyOptimizer
 from datetime import datetime
 
+# Adjust path to download location for the image set
 content_paths = [filename.replace('\\', '/') for filename in glob.glob('d:/DeepLearning/Data/ILSVRC2012_img_val/*.JPEG')]
 
 # Network related
@@ -27,6 +28,7 @@ def preprocess_image(image):
     array = np.asarray(image, dtype="float32")
     if len(array.shape) != 3:
         new_array = np.expand_dims(array, axis=3)
+        # Adjust for greyscale images
         array = np.tile(new_array, 3)
     array = np.expand_dims(array, axis=0) # Expanding dimensions in order to concatenate the images together
 
@@ -50,6 +52,7 @@ def deprocess_array(array):
     return image
 
 def load_content_array(content_path):
+    #Print progress every 1000 images
     if "000.JPEG" in content_path:
         print(content_path + ', time ' + str(datetime.now()))
 
@@ -67,7 +70,7 @@ model_layers = dict([(layer.name, layer.output) for layer in model.layers])
 conv_layer_names = [layer for layer in sorted(model_layers.keys()) if 'conv' in layer]
 content_count = len(content_paths)
 
-batch_size = 13000
+batch_size = 10000
 batches = (len(content_paths) + batch_size - 1) // batch_size
 first_initialized = False
 batch_direction = -1
@@ -104,16 +107,16 @@ for layer_name in conv_layer_names:
             item_counter = item_counter + 1
             layer_output = get_layer_output([content_array])[0]
             activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
-            #layer_output is 1, 512, 512, 64
+            #layer_output in conv1_1 is 1, 512, 512, 64
             activation_per_filter = np.sum(layer_output, axis=1)
             activation_per_filter = np.sum(activation_per_filter, axis=1)
             mean = activation_per_filter / activation_count_per_filter
             mean_total = mean_total + (mean - mean_total) / item_counter
-            #each filter outputs 512x512
+            #each filter outputs 512x512 in conv_1_1, same as input size.
     filter_scale_factor = 1 / mean_total
     filter_scale_factor = filter_scale_factor[0]
     layer_weights = output_layer.get_weights()
-    #3x3x64
+    #3x3x64 in conv1_1
     filter_weights = layer_weights[0]
     filter_bias = layer_weights[1]
 
@@ -127,39 +130,8 @@ for layer_name in conv_layer_names:
 
 #save
 model_json = model.to_json()
-with open("../models/normalized2.json", "w") as json_file:
+with open("../models/normalized.json", "w") as json_file:
     json_file.write(model_json)
 # serialize weights to HDF5
-model.save_weights("../models/normalized2.h5")
+model.save_weights("../models/normalized.h5")
 print("Saved model to disk")
-
-#final evaluation
-output_layer = model.get_layer(layer_name)
-get_layer_output = K.function([model.layers[0].input],
-                                  [output_layer.output])
-layer_output = get_layer_output([content_arrays[0]])[0]
-
-#layer_output is 1, 512, 512, 64
-activation_per_filter = np.sum(layer_output, axis=1)
-activation_per_filter = np.sum(activation_per_filter, axis=1)
-
-#each filter outputs 512x512
-activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
-mean_activation = activation_per_filter / activation_count_per_filter
-#should be 64
-print(np.sum(mean_activation))
-
-output_layer = model.get_layer(layer_name)
-get_layer_output = K.function([model.layers[0].input],
-                                  [output_layer.output])
-layer_output = get_layer_output([content_arrays[1]])[0]
-
-#layer_output is 1, 512, 512, 64
-activation_per_filter = np.sum(layer_output, axis=1)
-activation_per_filter = np.sum(activation_per_filter, axis=1)
-
-#each filter outputs 512x512
-activation_count_per_filter = layer_output.shape[1]*layer_output.shape[2]
-mean_activation = activation_per_filter / activation_count_per_filter
-#should be 64
-print(np.sum(mean_activation))
