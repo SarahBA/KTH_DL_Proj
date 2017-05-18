@@ -1,3 +1,4 @@
+#Calculates the mean activation across a directory of images. This was run with the 50k images in the ISLVRC2012 validation set.
 from PIL import Image
 import math
 import numpy as np
@@ -51,7 +52,6 @@ content_arrays = [load_content_array(content_path) for content_path in content_p
 
 ###### Model Loading
 model = VGG19(input_tensor=None, weights="imagenet", include_top=False, pooling="avg")
-#model.load_weights("../models/normalized.h5")
 model_layers = dict([(layer.name, layer.output) for layer in model.layers])
 conv_layer_names = [layer for layer in sorted(model_layers.keys()) if 'conv' in layer]
 content_count = len(content_arrays)
