@@ -1,3 +1,5 @@
+# Normalizes the weights in the VGG19 network (see report for more details)
+
 from PIL import Image
 import math
 import numpy as np
@@ -12,7 +14,7 @@ import gc
 from ScipyOptimizer import ScipyOptimizer
 from datetime import datetime
 
-content_paths = [filename.replace('\\', '/') for filename in glob.glob('d:/DeepLearning/Data/ILSVRC2012_img_val/*.JPEG')] 
+content_paths = [filename.replace('\\', '/') for filename in glob.glob('d:/DeepLearning/Data/ILSVRC2012_img_val/*.JPEG')]
 
 # Network related
 meanRGB = [123.68, 116.779, 103.939]
@@ -27,7 +29,7 @@ def preprocess_image(image):
         new_array = np.expand_dims(array, axis=3)
         array = np.tile(new_array, 3)
     array = np.expand_dims(array, axis=0) # Expanding dimensions in order to concatenate the images together
-    
+
     array[:, :, :, 0] -= meanRGB[0] # Subtracting the mean values
     array[:, :, :, 1] -= meanRGB[1]
     array[:, :, :, 2] -= meanRGB[2]

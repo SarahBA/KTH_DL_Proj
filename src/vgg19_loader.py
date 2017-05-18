@@ -1,3 +1,6 @@
+# This file contains the redefined VGG19 network with average pooling on all the layers.
+# THE FOLLOWING CODE IS FROM THE KERAS STANDARD LIBRARY AND HAS JUST BEEN SLIGHTLY ALTERED BY US
+
 # -*- coding: utf-8 -*-
 """VGG19 model for Keras.
 # Reference
