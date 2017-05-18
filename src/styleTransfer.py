@@ -53,7 +53,7 @@ meanRGB = [123.68, 116.779, 103.939]
 use_photo_loss = True
 ###### Functions definitions
 
-# Computes the content loss value for the content features and result features (both are tensors)
+
 def content_loss(content_feature, result_feature):
     return (1/2) * backend.sum(backend.square(content_feature - result_feature))
 
@@ -78,11 +78,14 @@ def total_variation_loss(x, height, width):
     return backend.sum(backend.pow(a + b, 1.25))
 
 
+# Only used for the photorealistic loss
 def rolling_block(A, block=(3, 3)):
     shape = (A.shape[0] - block[0] + 1, A.shape[1] - block[1] + 1) + block
     strides = (A.strides[0], A.strides[1]) + A.strides
     return as_strided(A, shape=shape, strides=strides)
 
+
+# Only used for the photorealistic loss
 def getlaplacian(i_arr: np.ndarray, consts: np.ndarray, epsilon: float = 0.0000001, win_size: int = 1):
     neb_size = (win_size * 2 + 1) ** 2
     h, w, c = i_arr.shape
@@ -119,6 +122,7 @@ def getlaplacian(i_arr: np.ndarray, consts: np.ndarray, epsilon: float = 0.00000
     a_sparse = sps.diags([sum_a], [0], shape=(img_size, img_size), dtype="float32") - a_sparse
     return a_sparse
 
+# Only used for the photorealistic loss
 def total_photo_loss(result_tensor, height, width, laplaciantensor):	
 	content_array_mult = backend.reshape(result_tensor[0, :, :, :], (width * height, 3)) / 255.0
 	multiplied = tf.sparse_tensor_dense_matmul(laplaciantensor, content_array_mult)
@@ -243,6 +247,7 @@ def main(args):
 
 	# Regularization of the result image
 	loss += regularization * total_variation_loss(result_tensor, height, width)
+
 	#Add photo loss regularization term
 	if use_photo_loss:		
 		content_array_l = img_to_double(content_array)
