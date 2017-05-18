@@ -7,8 +7,8 @@ import time
 from keras import backend
 from keras.models import Model
 from keras.applications.vgg16 import VGG16
-from vgg19_loader import VGG19
-#from keras.applications.vgg19 import VGG19
+#from vgg19_loader import VGG19
+from keras.applications.vgg19 import VGG19
 from scipy.optimize import fmin_l_bfgs_b
 from scipy.misc import imsave
 import argparse
@@ -23,13 +23,13 @@ from ScipyOptimizer import ScipyOptimizer
 parser = argparse.ArgumentParser(description='Apply the style of an image onto another one.',
 								 usage = 'styleTransfer.py -s <style_image> -c <content_image>')
 
-parser.add_argument('-s', '--style-img', type=str, required=False, help='image to use as style', default="../images/inputs/Der_Schrei.jpg")
-parser.add_argument('-c', '--content-img', type=str, required=False, help='image to use as content', default="../images/inputs/tubingen.jpg")
+parser.add_argument('-s', '--style-img', type=str, required=False, help='image to use as style', default="../images/inputs/maxresdefault.jpg")
+parser.add_argument('-c', '--content-img', type=str, required=False, help='image to use as content', default="../images/inputs/white-pine-lake-cloudy-reflection.jpg")
 parser.add_argument('-mi', '--max-iter', type=int, required=False, default=200,
 					help='the maximum number of iterations for generating the result image')
-parser.add_argument('-sw', '--style-weight', type=float, required=False, default=1000,
+parser.add_argument('-sw', '--style-weight', type=float, required=False, default=100,
 					help='weight of the style when generating the image')
-parser.add_argument('-cw', '--content-weight', type=float, required=False, default=5,
+parser.add_argument('-cw', '--content-weight', type=float, required=False, default=1,
 					help='weight of the content when generating the image')
 parser.add_argument('-rw', '--reg-weight', type=float, required=False, default=0,
 					help='weight of the noise elimination when generating the image')
@@ -37,7 +37,7 @@ parser.add_argument('-i', '--init', type=str, required=False, default='noise',
 					help='initialization strategy (can be content, style, or noise)')
 parser.add_argument('--size', type=int, required=False, default=512,
 					help='size of the result image in pixels (height and width are set to the same value)')
-parser.add_argument('-o', '--output', type=str, required=False, default='../images/run/b13/result_photo_',
+parser.add_argument('-o', '--output', type=str, required=False, default='../images/run/b18/result_photo_',
 					help='define the base path and name for the generated result images')
 parser.add_argument('-cl', '--content-layer', type=str, required=False, default='block4_conv2',
 					help='the name of the layer to use for the content function')
@@ -50,7 +50,7 @@ parser.add_argument('-m', '--model', type=str, required=False, default='VGG19',
 
 ##### Hard Coded Parameters
 meanRGB = [123.68, 116.779, 103.939]
-use_photo_loss = False
+use_photo_loss = True
 ###### Functions definitions
 
 # Computes the content loss value for the content features and result features (both are tensors)
@@ -120,13 +120,13 @@ def getlaplacian(i_arr: np.ndarray, consts: np.ndarray, epsilon: float = 0.00000
     return a_sparse
 
 def total_photo_loss(result_tensor, height, width, laplaciantensor):	
-	content_array_mult = backend.reshape(result_tensor[:, :, :, 0], (width * height, 1))
-	tftensor2 = content_array_mult
-	multiplied = tf.sparse_tensor_dense_matmul(laplaciantensor, tftensor2)
-	content_array_mult_2 = backend.transpose(tftensor2)
+	content_array_mult = backend.reshape(result_tensor[0, :, :, :], (width * height, 3)) / 255.0
+	multiplied = tf.sparse_tensor_dense_matmul(laplaciantensor, content_array_mult)
+	content_array_mult_2 = backend.transpose(content_array_mult)
 	multiplied2 = backend.dot(content_array_mult_2, multiplied)
-	return backend.sum(multiplied2)
-
+	extracted = tf.diag_part(multiplied2)
+	final_sum = tf.reduce_sum(extracted) 
+	return final_sum
 
 # Transforms an image object into an array ready to be fed to VGG
 def preprocess_image(image, height, width):
@@ -185,6 +185,7 @@ def main(args):
 		init_result_image = 'noise'
 
 	style_layers_weights = [1.0/len(style_layers_names) for i in range(len(style_layers_names))]
+	#style_layers_weights = [16.0/31.0, 8.0/31.0, 4.0/31.0, 2.0/31.0, 1.0/31.0]
 
 	print('\nRunning for maximum %d iterations' % max_iter)
 	print('Using %s network' % model_name)
@@ -198,10 +199,10 @@ def main(args):
 	##### Images Loading
 	content_image = Image.open(content_path)
 	style_image = Image.open(style_path)
-
+	gatys_image = Image.open("../images/inputs/lake_run_gatys.png")
 	content_array = preprocess_image(content_image, height, width)
 	style_array = preprocess_image(style_image, height, width)
-
+	gatys_array = preprocess_image(gatys_image, height, width)
 	# Creating placeholders in tensorflow
 	content_tensor = backend.constant(content_array)
 	style_tensor = backend.constant(style_array)
@@ -243,12 +244,11 @@ def main(args):
 	# Regularization of the result image
 	loss += regularization * total_variation_loss(result_tensor, height, width)
 	#Add photo loss regularization term
-	if use_photo_loss:
+	if use_photo_loss:		
 		content_array_l = img_to_double(content_array)
 		content_array_l = content_array[0, :, :, :]
 		laplacian = getlaplacian(content_array_l, np.zeros(shape=(height, width)), 1e-7, 1)
 		laplaciantensor = convert_sparse_matrix_to_sparse_tensor(laplacian)
-
 		loss += photo_weight * total_photo_loss(result_tensor, height, width, laplaciantensor)
 
 	###### Generating the result image
@@ -260,8 +260,8 @@ def main(args):
 	elif init_result_image == "content":
 	    result_array = np.copy(content_array)
 	else:
-	    result_array = np.random.uniform(0, 255, (1, height, width, 3)) - 128
-
+	    #result_array = np.random.uniform(0, 255, (1, height, width, 3)) - 128
+		result_array = np.copy(gatys_array)
 	# Starting iterations
 	total_time = 0
 	for i in range(max_iter):
