@@ -1,5 +1,10 @@
 # Implementation of the style transfer algorithm as per report description.
 
+##### Parameters we didn't have time to parameterize
+use_photo_loss = False
+use_avg_pool_vgg19 = False
+#####
+
 from PIL import Image
 import math
 import numpy as np
@@ -7,8 +12,11 @@ import time
 from keras import backend
 from keras.models import Model
 from keras.applications.vgg16 import VGG16
-#from vgg19_loader import VGG19
-from keras.applications.vgg19 import VGG19
+if use_avg_pool_vgg19:
+	from vgg19_loader import VGG19
+else: 
+	from keras.applications.vgg19 import VGG19
+
 from scipy.optimize import fmin_l_bfgs_b
 from scipy.misc import imsave
 import argparse
@@ -47,10 +55,9 @@ parser.add_argument('-sl', '--style-layers', type=str, nargs='+', required=False
 parser.add_argument('-m', '--model', type=str, required=False, default='VGG19',
 					help='the CNN to use (can be VGG16 or VGG19)')
 
-
 ##### Hard Coded Parameters
+# Means of imagenet pixels, publically available.
 meanRGB = [123.68, 116.779, 103.939]
-use_photo_loss = True
 ###### Functions definitions
 
 
@@ -77,15 +84,11 @@ def total_variation_loss(x, height, width):
     b = backend.square(x[:, :height-1, :width-1, :] - x[:, :height-1, 1:, :])
     return backend.sum(backend.pow(a + b, 1.25))
 
-
 # Only used for the photorealistic loss
-def rolling_block(A, block=(3, 3)):
-    shape = (A.shape[0] - block[0] + 1, A.shape[1] - block[1] + 1) + block
-    strides = (A.strides[0], A.strides[1]) + A.strides
-    return as_strided(A, shape=shape, strides=strides)
-
-
-# Only used for the photorealistic loss
+# Implementation of laplacian not built by us, code available here: 
+# http://www.codegist.net/snippet/python/laplacianpy_progamergov_python
+# with original source here: https://github.com/martinbenson/deep-photo-styletransfer
+# adjusted for data types and dimensions in this project.
 def getlaplacian(i_arr: np.ndarray, consts: np.ndarray, epsilon: float = 0.0000001, win_size: int = 1):
     neb_size = (win_size * 2 + 1) ** 2
     h, w, c = i_arr.shape
@@ -181,15 +184,18 @@ def main(args):
 	style_layers_names = args.style_layers
 
 	model_name = args.model
-	if model_name != 'VGG16' or model_name != 'VGG19':
+	if model_name != 'VGG16' and model_name != 'VGG19':
 		model_name = 'VGG19'
 
 	init_result_image = args.init
-	if init_result_image != 'style' or init_result_image != 'content' or init_result_image != 'noise':
+	if init_result_image != 'style' and init_result_image != 'content' and init_result_image != 'noise':
 		init_result_image = 'noise'
 
 	style_layers_weights = [1.0/len(style_layers_names) for i in range(len(style_layers_names))]
+	# Uncomment one of the below and comment out the line above to try different style weights.
+	# These lines assume 5 style layers are used.
 	#style_layers_weights = [16.0/31.0, 8.0/31.0, 4.0/31.0, 2.0/31.0, 1.0/31.0]
+	#style_layers_weights = [1.0/31.0, 2.0/31.0, 4.0/31.0, 8.0/31.0, 16.0/31.0]
 
 	print('\nRunning for maximum %d iterations' % max_iter)
 	print('Using %s network' % model_name)
