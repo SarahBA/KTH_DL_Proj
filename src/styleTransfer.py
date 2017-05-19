@@ -1,10 +1,13 @@
 # Implementation of the style transfer algorithm as per report description.
 
 ##### Parameters we didn't have time to parameterize
-use_photo_loss = False
+use_photo_loss = True
 use_avg_pool_vgg19 = False
+use_normalized_weights_gatys = False
+use_normalized_weights = False
 #####
-
+import os
+os.environ["KERAS_BACKEND"] = 'tensorflow'
 from PIL import Image
 import math
 import numpy as np
@@ -59,7 +62,8 @@ parser.add_argument('-m', '--model', type=str, required=False, default='VGG19',
 # Means of imagenet pixels, publically available.
 meanRGB = [123.68, 116.779, 103.939]
 ###### Functions definitions
-
+meanimagearray = np.broadcast_to(np.asarray(meanRGB), (1, 512, 512, 3))
+meanimage = backend.constant(meanRGB)
 
 def content_loss(content_feature, result_feature):
     return (1/2) * backend.sum(backend.square(content_feature - result_feature))
@@ -126,14 +130,16 @@ def getlaplacian(i_arr: np.ndarray, consts: np.ndarray, epsilon: float = 0.00000
     return a_sparse
 
 # Only used for the photorealistic loss
-def total_photo_loss(result_tensor, height, width, laplaciantensor):	
-	content_array_mult = backend.reshape(result_tensor[0, :, :, :], (width * height, 3)) / 255.0
+def total_photo_loss(result_tensor, height, width, laplaciantensor):
+	result_tensor = result_tensor + meanimage
+	content_array_mult = backend.reshape(result_tensor[0, :, :, :], (width * height, 3))
+	content_array_mult = content_array_mult / 256.0
 	multiplied = tf.sparse_tensor_dense_matmul(laplaciantensor, content_array_mult)
 	content_array_mult_2 = backend.transpose(content_array_mult)
 	multiplied2 = backend.dot(content_array_mult_2, multiplied)
 	extracted = tf.diag_part(multiplied2)
 	final_sum = tf.reduce_sum(extracted) 
-	return final_sum
+	return final_sum / 256.0
 
 # Transforms an image object into an array ready to be fed to VGG
 def preprocess_image(image, height, width):
@@ -146,6 +152,12 @@ def preprocess_image(image, height, width):
     array = array[:, :, :, ::-1] # Reordering from RGB to BGR to fit VGG19
     return array
 
+def add_mean(array):
+	# called with Vgg19 array so BGR order
+	array = array[:, :, :, 2] + meanRGB[0] # Adding the mean values
+	array = array[:, :, :, 1] + meanRGB[1]
+	array = array[:, :, :, 0] + meanRGB[2]
+	return array
 
 # Transforms an array representing an image into a scipy image object
 def deprocess_array(array, height, width):
@@ -160,7 +172,7 @@ def deprocess_array(array, height, width):
     return image
 
 def img_to_double(image):
-    return image / 255.0
+    return image / 256.0
 
 def convert_sparse_matrix_to_sparse_tensor(X):
     coo = X.tocoo()
@@ -176,7 +188,7 @@ def main(args):
 	content_weight = args.content_weight
 	style_weight = args.style_weight
 	regularization = args.reg_weight
-	photo_weight = 10000
+	photo_weight = 1000000
 	height = args.size
 	width = args.size
 	result_image_pathprefix = args.output
@@ -209,10 +221,10 @@ def main(args):
 	##### Images Loading
 	content_image = Image.open(content_path)
 	style_image = Image.open(style_path)
-	gatys_image = Image.open("../images/inputs/lake_run_gatys.png")
+#	gatys_image = Image.open("../images/inputs/lake_run_gatys.png")
 	content_array = preprocess_image(content_image, height, width)
 	style_array = preprocess_image(style_image, height, width)
-	gatys_array = preprocess_image(gatys_image, height, width)
+#	gatys_array = preprocess_image(gatys_image, height, width)
 	# Creating placeholders in tensorflow
 	content_tensor = backend.constant(content_array)
 	style_tensor = backend.constant(style_array)
@@ -271,8 +283,8 @@ def main(args):
 	elif init_result_image == "content":
 	    result_array = np.copy(content_array)
 	else:
-	    #result_array = np.random.uniform(0, 255, (1, height, width, 3)) - 128
-		result_array = np.copy(gatys_array)
+	    result_array = np.random.uniform(0, 255, (1, height, width, 3)) - 128
+		#result_array = np.copy(gatys_array)
 	# Starting iterations
 	total_time = 0
 	for i in range(max_iter):
